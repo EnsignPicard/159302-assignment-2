@@ -1,0 +1,190 @@
+Have:
+
+FAMM (from article like not all cells)
+linear combination of variables for our problem
+output for each rule
+fuzy membership functions
+
+-----> LIST OF RULES?: we use Zadeh and? stream comment show which to use?
+
+process:
+
+1.receive crisp numerical input of variables
+
+2. fuzzify the inputs for each fuzzy set to see the degree of membership of that fuzzy set using membership function
+
+3. compute degree of applicability of rules: WEIGHTS for each fuzzy rule/ non zero item in famm by using fuzzy operator on fuzzy inputs
+
+4.DEFUZZIFICATION: compute crisp output using CENTRE OF MASS sum of (weights x output ) / sum of to rull strenghth of fuzzy inputs weight
+
+CODE
+----------------------------------------
+
+crisp_output = fuzzy_system(inputs, fz)
+
+we have two inputs angle and distance 
+inputs is an array of crisp inputs float inputs[MAX_NO_OF_INPUTS] and fz is a fuzzy system fuzzy_system_rec fz
+
+ we have enumerated data types in fuzzy logic.h
+we have trapezoid Enum type and trapezoid function in fuzzylogic.h _what starting values maye n article
+we have a rule struct in fuzzy logic.h takes array of inputs i.e. didtsnce and ngl and an array of fuzzy sets e.g. small very far very fast ect…
+
+So what are we actually putting in rules? like what is meant to go in the struct
+
+  fuzzy_system_rec a structure representing a zero order sugeno fuzzy inference system
+contains all the membership functions as a 2d array of trpazoids inp_mem_fns
+
+we hava a ponter of type struct for the rules, we will need to allocate memory for this 
+number of rules times size of a rule struct
+
+then we haave some variables
+int no_of_inputs number of inputs
+no_of_inp_regions nmber of fuzzy sets associate with each output
+no_of_rules number of rules
+no_of_outputs number of outputs
+output_vales actual values assigned to rule outputs
+
+fuzzy_system_rec
+├── rules[] ←────────────── Array of rule structs
+│   ├── rules[0]
+│   │   ├── inp_index[] ←── Array of input variable indices
+│   │   ├── inp_fuzzy_set[] ← Array of fuzzy set indices  
+│   │   └── out_fuzzy_set ←─ Single output index
+│   ├── rules[1]
+│   └── rules[49]
+└── inp_mem_fns[][] ←────── 2D array of membership functions
+
+// Initialize membership function for "angle is small"
+fl->inp_mem_fns[in_angle][in_small] = init_trapz(0.0, 0.0, 14.0, 20.0, left_trapezoid);
+
+// Initialize membership function for "distance is very_far"  
+fl->inp_mem_fns[in_distance][in_very_far] = init_trapz(50.0, 60.0, 100.0, 100.0, right_trapezoid);
+
+
+The Complete Flow
+
+    Rule definition: fl->rules[0].inp_fuzzy_set[0] = in_small; (stores integer index)
+    Look up membership function: fl->inp_mem_fns[in_angle][in_small] (gets actual trapezoid data)
+    Calculate membership: trapz(input_value, trapezoid_data) (returns degree 0.0-1.0)
+
+So inp_mem_fns is the lookup table that converts the integer indices stored in rules into actual mathematical functions that can calculate membership degrees.
+
+
+to calulate egree of membership we call on traps 
+
+float fuzzy_system ( float inputs[ ], fuzzy_system_rec fz) {
+int i, j;
+short variable_index, fuzzy_set;
+float sum1 = 0.0f, sum2 = 0.0f, weight;
+float m_values[MAX_NO_OF_INPUTS];
+for (i = 0; i < fz.no_of_rules; i++) {
+for (j = 0; j < fz.no_of_inputs; j++) {
+variable_index = fz.rules[i].inp_index[j];
+fuzzy_set = fz.rules[i].inp_fuzzy_set[j];
+m_values[j] = trapz(inputs[variable_index], fz.inp_mem_fns[variable_index][fuzzy_set]);
+} /* end j */
+weight = min_of (m_values, fz.no_of_inputs);
+sum1 += weight * fz.output_values[ fz.rules[i].out_fuzzy_set ];
+sum2 += weight;
+} /* end i */
+if (fabs(sum2) < TOO_SMALL) { // TOO_SMALL = 1e-6
+cout << "\r\nFLPRCS Error: sum2 in fuzzy_system is 0." << endl;
+//exit(1);
+return 0.0;
+}
+return (sum1/sum2);
+
+Fuzzy System Development in main.cpp
+
+1. Declare a global variable for the fuzzy system.
+e.g. fuzzy_system_rec g_fuzzy_system;
+
+Define the maximum number of Fuzzy Sets to be used.
+e.g. #define MAX_NO_OF_INP_REGIONS 7 in fuzzylogic.h
+
+2. Initialise the fuzzy system. File: fuzzylogic.cpp
+
+void initFuzzySystem (fuzzy_system_rec* fl) {
+fl->no_of_inputs = 2; //inputs are handled 2 at a time only
+fl->no_of_inp_regions = 7; //number of fuzzy sets per input
+fl->no_of_rules = 49*2; //number of rules
+//----
+fl->output_values [out_small_push_left] = -15f; //-15 Newtons
+fl->output_values [out_large_push_left] = -100f; //-100 Newtons
+//… and so on…
+...
+fl->rules = new rule [fl->no_of_rules]; //allocate memory for the rules
+initFuzzyRules (fl); //initialise the rules; this is user-defined
+initMembershipFunctions(fl); //initialise the membership functions; this is user-
+//defined
+}
+
+3. Initialise fuzzy rules. File: fuzzylogic.cpp
+
+void initFuzzyRules (fuzzy_system_rec* fl) {
+int i;
+for (i = 0;i < fl->no_of_rules;i++) {
+//(*fl).rules[i].inp_index[0] = in_angle; //alternatively
+fl->rules[i].inp_index[0] = in_angle;
+fl->rules[i].inp_index[1] = in_angle_dot;
+}
+fl->rules[0].inp_fuzzy_set[0] = in_negatively_small;
+fl->rules[0].inp_fuzzy_set[1] = in_falling_to_left_fast;
+fl->rules[0].out_fuzzy_set = out_large_push_left;
+// define the other remaining rules next
+// and so on...
+}
+
+define two inputs x and y
+
+that combine x and x prine and theta and theta prime in linear equation
+
+1. we have if y positively medium and x is negatively medium then output is negatively small
+
+2. we have if y positively medium and x is zero then output is positivly small
+
+3. we have if y positively medium and x is positivly medium then output is negatively small
+
+4. we have if y positively small and x is negatively small then output is negatively small
+
+5. we have if y positively small and x is positively small then output is positively medium
+
+6. we have if y zero and x is negatively medium then output is negatively medium
+
+7. we have if y zero and x is zero then output is zero
+
+8. we have if y zero and x is positivly medium then output is positively medium
+
+9. we have if y negatively small and x is negatively small then output is negatively medium
+
+10. we have if y negatively small and x is positivly small then output is positively small
+
+11. we have if y negativly medium and x is negatively medium then output is negatively large
+
+12. we have if y negativly medium and x is zero then output is negatively small
+
+13. we have if y negativly medium and x is positvly medium then output is positivly small
+
+4. each fuzzy set for each of the inputs are initialised here 
+
+void initMembershipFunctions ( fuzzy_system_rec* fl ) {
+//angle
+fl->inp_mem_fns[in_angle][in_negatively_large] = init_trapz(14.0f,20.0f,0.0f,0.0f,
+left_trapezoid);
+fl->inp_mem_fns[in_angle][in_negatively_medium] = init_trapz(14.0f,20.0f,34.0f,40.0f,
+regular_trapezoid);
+//...
+fl->inp_mem_fns[in_angle][in_positively_large] = init_trapz (34.0f, 40.0f, 0.0f, 0.0f,
+right_trapezoid);
+
+//angular velocity
+//...
+//...
+//...
+//and so on...
+
+
+5. in main.cpp modify runinvertedpendulum to suit fuzzlog design
+
+
+once done fuzzy system enable it and then clibrate then enable data collection
